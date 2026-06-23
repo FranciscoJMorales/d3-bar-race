@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Puestos Quiniela</title>
+<link rel="stylesheet" type="text/css" href="./inspector.css">
+<body>
+<script>
+
+  if (document.URL.includes('d3-video-recording')){
+    window.currentTime = 0
+    performance.now = () => currentTime
+  }
+  
+</script>
+<script type="module">
+
+import define from "./index.js";
+import {Runtime, Library, Inspector} from "./runtime.js";
+
+const runtime = new Runtime();
+const main = runtime.module(define, Inspector.into(document.body));
+
+</script>

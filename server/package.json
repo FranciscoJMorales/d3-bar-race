@@ -1,0 +1,14 @@
+{
+  "name": "4a816c735e3b315f",
+  "main": "4a816c735e3b315f@3133.js",
+  "version": "3133.0.0",
+  "homepage": "https://observablehq.com/d/4a816c735e3b315f",
+  "author": {
+    "name": "fjmachine",
+    "url": "https://observablehq.com/@fjmachine"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "@observablehq/runtime": "4 - 5"
+  }
+}
