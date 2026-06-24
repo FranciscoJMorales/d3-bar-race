@@ -1,4 +1,4 @@
-# Puestos Quiniela
+# D3 Bar Race
 
 https://observablehq.com/d/4a816c735e3b315f@3133
 
