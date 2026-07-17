@@ -57,8 +57,8 @@ function _duration(){return(
 250
 )}
 
-function _n(){return(
-27
+function _n(names){return(
+names.size
 )}
 
 function _names(data){return(
@@ -294,7 +294,7 @@ export default function define(runtime, observer) {
   main.variable(observer("replay")).define("replay", ["Generators", "viewof replay"], (G, _) => G.input(_));
   main.variable(observer("chart")).define("chart", ["replay","d3","width","height","bars","axis","labels","ticker","keyframes","duration","x","invalidation"], _chart);
   main.variable(observer("duration")).define("duration", _duration);
-  main.variable(observer("n")).define("n", _n);
+  main.variable(observer("n")).define("n", ["names"], _n);
   main.variable(observer("names")).define("names", ["data"], _names);
   main.variable(observer("datevalues")).define("datevalues", ["d3","data"], _datevalues);
   main.variable(observer("rank")).define("rank", ["names","d3","n"], _rank);
