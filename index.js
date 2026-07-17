@@ -37,8 +37,10 @@ async function* _chart(replay,d3,width,height,bars,axis,labels,ticker,keyframes,
         .duration(duration)
         .ease(d3.easeLinear);
 
-    // Extract the top bar’s value.
-    x.domain([0, keyframe[1][0].value]);
+    // Extract the top bar’s value. Fall back to 1 when every bar is still 0,
+    // otherwise the domain is [0, 0] and the linear scale collapses to its
+    // midpoint — pinning x(0) to the center of the chart instead of the left.
+    x.domain([0, keyframe[1][0].value || 1]);
 
     updateAxis(keyframe, transition);
     updateBars(keyframe, transition);
@@ -56,7 +58,7 @@ function _duration(){return(
 )}
 
 function _n(){return(
-24
+27
 )}
 
 function _names(data){return(
