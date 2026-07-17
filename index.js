@@ -14,7 +14,7 @@ function _replay(html){return(
 html`<button>Replay`
 )}
 
-async function* _chart(replay,d3,width,height,bars,axis,labels,ticker,keyframes,duration,x,invalidation)
+async function* _chart(replay,d3,width,height,bars,axis,labels,deltas,ticker,keyframes,duration,x,invalidation)
 {
   replay;
 
@@ -28,9 +28,12 @@ async function* _chart(replay,d3,width,height,bars,axis,labels,ticker,keyframes,
   const updateBars = bars(svg);
   const updateAxis = axis(svg);
   const updateLabels = labels(svg);
+  const updateDeltas = deltas(svg);
   const updateTicker = ticker(svg);
 
   yield svg.node();
+
+  const lastKeyframe = keyframes[keyframes.length - 1];
 
   for (const keyframe of keyframes) {
     const transition = svg.transition()
@@ -45,6 +48,7 @@ async function* _chart(replay,d3,width,height,bars,axis,labels,ticker,keyframes,
     updateAxis(keyframe, transition);
     updateBars(keyframe, transition);
     updateLabels(keyframe, transition);
+    updateDeltas(keyframe, transition, keyframe === lastKeyframe);
     updateTicker(keyframe, transition);
 
     invalidation.then(() => svg.interrupt());
@@ -72,8 +76,8 @@ Array.from(d3.rollup(data, ([d]) => d.value, d => +d.timestamp, d => d.name))
 )}
 
 function _rank(names,d3,n){return(
-function rank(value) {
-  const data = Array.from(names, name => ({name, value: value(name)}));
+function rank(value, base, target) {
+  const data = Array.from(names, name => ({name, value: value(name), base: base(name), target: target(name)}));
   data.sort((a, b) => d3.descending(a.value, b.value));
   for (let i = 0; i < data.length; ++i) data[i].rank = Math.min(n, i);
   return data;
@@ -93,11 +97,11 @@ function _keyframes(d3,datevalues,k,rank)
       const t = i / k;
       keyframes.push([
         ka * (1 - t) + kb * t,
-        rank(name => (a.get(name) || 0) * (1 - t) + (b.get(name) || 0) * t)
+        rank(name => (a.get(name) || 0) * (1 - t) + (b.get(name) || 0) * t, name => a.get(name) || 0, name => b.get(name) || 0)
       ]);
     }
   }
-  keyframes.push([kb, rank(name => b.get(name) || 0)]);
+  keyframes.push([kb, rank(name => b.get(name) || 0, name => a.get(name) || 0, name => b.get(name) || 0)]);
   return keyframes;
 }
 
@@ -171,6 +175,65 @@ function labels(svg) {
     .call(bar => bar.transition(transition)
       .attr("transform", d => `translate(${x(d.value)},${y(d.rank)})`)
       .call(g => g.select("tspan").tween("text", d => textTween((prev.get(d) || d).value, d.value))));
+}
+)}
+
+function _deltas(n,x,prev,y,next,formatDelta,deltaColor){return(
+function deltas(svg) {
+  const g = svg.append("g")
+      .style("font", "bold 12px var(--sans-serif)")
+      .style("font-variant-numeric", "tabular-nums")
+      .attr("text-anchor", "start");
+
+  let label = g.selectAll("text");
+
+  return ([timestamp, data], transition, isLast) => {
+    label = label
+      .data(data.slice(0, n), d => d.name)
+      .join(
+        enter => enter.append("text")
+          .attr("transform", d => `translate(${x((prev.get(d) || d).value)},${y((prev.get(d) || d).rank)})`)
+          .attr("x", 6)
+          .attr("y", y.bandwidth() / 2)
+          .attr("dy", "0.35em"),
+        update => update,
+        exit => exit.transition(transition).remove()
+          .attr("transform", d => `translate(${x((next.get(d) || d).value)},${y((next.get(d) || d).rank)})`)
+      )
+      // Read the step's target (not the interpolated value), so the label shows
+      // the full increase for the whole step instead of counting up 1 by 1.
+      .call(label => label
+        .attr("font-weight", "bold")
+        .attr("fill", d => deltaColor(d.target, d.base))
+        .text(d => formatDelta(d.target, d.base)));
+
+    label.transition(transition)
+        .attr("transform", d => `translate(${x(d.value)},${y(d.rank)})`);
+
+    // Hide the labels once the race is over (last keyframe, no data left).
+    g.transition(transition).style("opacity", isLast ? 0 : 1);
+  };
+}
+)}
+
+function _formatDelta(){return(
+function formatDelta(target, base) {
+  // Ignore the tiebreaker decimals: compare integer parts only.
+  const gain = Math.floor(target) - Math.floor(base);
+  if (gain > 0) return `(+${gain})`;
+  if (gain < 0) return `(${gain})`;
+  return "(+0)";
+}
+)}
+
+function _deltaColor(){return(
+function deltaColor(target, base) {
+  const gain = Math.floor(target) - Math.floor(base);
+  if (gain < 0) return "#b71c1c";   // red   — decrease
+  if (gain === 0) return "#9e9e9e"; // grey  — no change
+  if (gain < 3) return "#e65100";   // dark orange — small gain (1–2)
+  if (gain < 5) return "#f57f17";   // light orange — medium gain (3–4)
+  return "#2e7d32";                 // green — 5 or more
 }
 )}
 
@@ -268,7 +331,7 @@ function _marginTop(){return(
 )}
 
 function _marginRight(){return(
-6
+55
 )}
 
 function _marginBottom(){return(
@@ -292,7 +355,7 @@ export default function define(runtime, observer) {
   main.variable(observer("labelData")).define("labelData", ["FileAttachment"], _labelData);
   main.variable(observer("viewof replay")).define("viewof replay", ["html"], _replay);
   main.variable(observer("replay")).define("replay", ["Generators", "viewof replay"], (G, _) => G.input(_));
-  main.variable(observer("chart")).define("chart", ["replay","d3","width","height","bars","axis","labels","ticker","keyframes","duration","x","invalidation"], _chart);
+  main.variable(observer("chart")).define("chart", ["replay","d3","width","height","bars","axis","labels","deltas","ticker","keyframes","duration","x","invalidation"], _chart);
   main.variable(observer("duration")).define("duration", _duration);
   main.variable(observer("n")).define("n", ["names"], _n);
   main.variable(observer("names")).define("names", ["data"], _names);
@@ -305,6 +368,9 @@ export default function define(runtime, observer) {
   main.variable(observer("next")).define("next", ["nameframes","d3"], _next);
   main.variable(observer("bars")).define("bars", ["n","color","y","x","prev","next"], _bars);
   main.variable(observer("labels")).define("labels", ["n","x","prev","y","next","textTween"], _labels);
+  main.variable(observer("deltas")).define("deltas", ["n","x","prev","y","next","formatDelta","deltaColor"], _deltas);
+  main.variable(observer("formatDelta")).define("formatDelta", _formatDelta);
+  main.variable(observer("deltaColor")).define("deltaColor", _deltaColor);
   main.variable(observer("textTween")).define("textTween", ["d3","formatNumber"], _textTween);
   main.variable(observer("formatNumber")).define("formatNumber", ["d3"], _formatNumber);
   main.variable(observer("tickFormat")).define("tickFormat", _tickFormat);
